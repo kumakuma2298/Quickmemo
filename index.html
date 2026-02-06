@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>あとで - 瞬間メモ</title>
+    
+    <!-- モバイルアプリ設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="あとで">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#f0f9ff">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji';
+            background-color: #f0f9ff; /* 爽やかな非常に薄いブルー */
+            overflow-x: hidden;
+        }
+        .memo-card:hover .action-btns {
+            opacity: 1;
+        }
+        .recording-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
+        #sidebar {
+            transition: transform 0.3s ease-in-out;
+            z-index: 100;
+        }
+        #overlay {
+            transition: opacity 0.3s ease-in-out;
+            z-index: 90;
+        }
+        .memo-done {
+            opacity: 0.6;
+            background-color: #eef2ff !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-20 text-slate-800">
+
+    <!-- サイドバー -->
+    <div id="overlay" class="fixed inset-0 bg-slate-900/50 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+    <div id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-white shadow-2xl -translate-x-full p-6">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-xl font-bold text-blue-900">メニュー</h2>
+            <button id="closeSidebar" class="p-2 hover:bg-blue-50 rounded-full transition-colors text-blue-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+        </div>
+        <nav class="space-y-2">
+            <button onclick="switchView('active')" class="w-full flex items-center gap-3 p-3 rounded-xl transition-colors font-medium" id="navActive">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                すべてのメモ
+            </button>
+            <button onclick="switchView('archived')" class="w-full flex items-center gap-3 p-3 rounded-xl transition-colors font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-600" id="navArchived">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+                アーカイブ・履歴
+            </button>
+        </nav>
+        <div class="absolute bottom-6 left-6 right-6 p-4 bg-blue-50/50 rounded-xl">
+            <p class="text-[10px] text-blue-700/60 leading-tight font-medium">完了したメモは自動的にアーカイブへ移動します。</p>
+        </div>
+    </div>
+
+    <div class="max-w-2xl mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <header class="mb-8 flex items-center justify-between relative">
+            <button id="openSidebar" class="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+            </button>
+            
+            <div class="text-center absolute left-1/2 -translate-x-1/2">
+                <h1 class="text-3xl font-extrabold text-slate-800 tracking-tighter" id="viewTitle">あとで</h1>
+            </div>
+
+            <button id="clearArchivedBtn" class="hidden text-xs font-semibold text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors border border-blue-200">
+                すべて削除
+            </button>
+            <div id="headerSpacer" class="w-10"></div>
+        </header>
+
+        <!-- 入力セクション -->
+        <div id="inputSection" class="bg-white rounded-2xl shadow-sm border border-blue-100 p-4 mb-8 transition-all">
+            <div class="relative">
+                <textarea 
+                    id="memoInput" 
+                    placeholder="忘れたくないことを、とりあえずここに。" 
+                    class="w-full h-32 p-4 text-lg border-none focus:ring-0 resize-none placeholder-slate-300"
+                ></textarea>
+                
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-blue-50">
+                    <button 
+                        id="voiceBtn" 
+                        class="p-3 rounded-full hover:bg-blue-50 text-blue-400 transition-all flex items-center gap-2"
+                        title="音声入力"
+                    >
+                        <svg id="micIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                        <span id="voiceStatus" class="text-sm font-medium hidden">録音中...</span>
+                    </button>
+
+                    <button 
+                        id="addBtn" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl font-semibold transition-colors flex items-center gap-2 shadow-md shadow-blue-100 active:scale-95"
+                    >
+                        <span>保存</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- メモリスト -->
+        <div class="space-y-4" id="memoList"></div>
+
+        <!-- 空の状態 -->
+        <div id="emptyState" class="text-center py-20 hidden">
+            <div class="text-blue-200 mb-4 flex justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M8 8h8"/><path d="M8 16h1 text-slate-100"/></svg>
+            </div>
+            <p id="emptyText" class="text-slate-400">メモがありません。</p>
+        </div>
+    </div>
+
+    <!-- トースト -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full text-sm font-medium shadow-xl opacity-0 transition-all duration-300 pointer-events-none z-50 border border-slate-700">
+        メッセージ
+    </div>
+
+    <script>
+        const memoInput = document.getElementById('memoInput');
+        const addBtn = document.getElementById('addBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const micIcon = document.getElementById('micIcon');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const memoList = document.getElementById('memoList');
+        const emptyState = document.getElementById('emptyState');
+        const emptyText = document.getElementById('emptyText');
+        const toast = document.getElementById('toast');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const openSidebar = document.getElementById('openSidebar');
+        const closeSidebar = document.getElementById('closeSidebar');
+        const inputSection = document.getElementById('inputSection');
+        const viewTitle = document.getElementById('viewTitle');
+        const clearArchivedBtn = document.getElementById('clearArchivedBtn');
+        const headerSpacer = document.getElementById('headerSpacer');
+
+        let memos = JSON.parse(localStorage.getItem('quick_memos') || '[]');
+        let currentView = 'active'; 
+        let isConfirmingClear = false;
+
+        renderMemos();
+        updateNavUI();
+
+        function toggleSidebar(show) {
+            if (show) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+                overlay.classList.add('opacity-100');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+                overlay.classList.remove('opacity-100');
+            }
+        }
+
+        openSidebar.addEventListener('click', () => toggleSidebar(true));
+        closeSidebar.addEventListener('click', () => toggleSidebar(false));
+        overlay.addEventListener('click', () => toggleSidebar(false));
+
+        function switchView(view) {
+            currentView = view;
+            
+            viewTitle.textContent = view === 'active' ? 'あとで' : 'アーカイブ・履歴';
+            
+            if (view === 'active') {
+                inputSection.classList.remove('hidden');
+                clearArchivedBtn.classList.add('hidden');
+                headerSpacer.classList.remove('hidden');
+                emptyText.innerHTML = '未完了のメモはありません。<br>上のボックスから入力してください。';
+            } else {
+                inputSection.classList.add('hidden');
+                clearArchivedBtn.classList.remove('hidden');
+                headerSpacer.classList.add('hidden');
+                emptyText.textContent = '完了またはアーカイブ済みのメモはありません。';
+                resetClearButton();
+            }
+            
+            updateNavUI();
+            renderMemos();
+            toggleSidebar(false);
+        }
+
+        function updateNavUI() {
+            const activeBtn = document.getElementById('navActive');
+            const archivedBtn = document.getElementById('navArchived');
+            
+            activeBtn.className = "w-full flex items-center gap-3 p-3 rounded-xl transition-colors font-medium";
+            archivedBtn.className = "w-full flex items-center gap-3 p-3 rounded-xl transition-colors font-medium";
+
+            if (currentView === 'active') {
+                activeBtn.classList.add('bg-blue-50', 'text-blue-600');
+                archivedBtn.classList.add('text-slate-600', 'hover:bg-blue-50', 'hover:text-blue-600');
+            } else {
+                archivedBtn.classList.add('bg-blue-50', 'text-blue-600');
+                activeBtn.classList.add('text-slate-600', 'hover:bg-blue-50', 'hover:text-blue-600');
+            }
+        }
+
+        clearArchivedBtn.addEventListener('click', () => {
+            if (!isConfirmingClear) {
+                isConfirmingClear = true;
+                clearArchivedBtn.textContent = '本当に削除しますか？';
+                clearArchivedBtn.classList.add('bg-blue-600', 'text-white');
+                setTimeout(resetClearButton, 3000);
+            } else {
+                memos = memos.filter(m => !m.archived && !m.completed);
+                saveToStorage();
+                renderMemos();
+                showToast('履歴をすべて削除しました');
+                resetClearButton();
+            }
+        });
+
+        function resetClearButton() {
+            isConfirmingClear = false;
+            clearArchivedBtn.textContent = 'すべて削除';
+            clearArchivedBtn.classList.remove('bg-blue-600', 'text-white');
+        }
+
+        function saveMemo() {
+            const text = memoInput.value.trim();
+            if (!text) return;
+            const now = new Date();
+            const timestamp = {
+                date: now.toLocaleDateString('ja-JP'),
+                time: now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+                raw: now.toISOString()
+            };
+            const newMemo = {
+                id: crypto.randomUUID(),
+                text: text,
+                timestamp: timestamp,
+                archived: false,
+                completed: false
+            };
+            memos.unshift(newMemo);
+            saveToStorage();
+            memoInput.value = '';
+            renderMemos();
+            showToast('メモを保存しました');
+        }
+
+        function toggleArchive(id) {
+            const index = memos.findIndex(m => m.id === id);
+            if (index !== -1) {
+                memos[index].archived = !memos[index].archived;
+                saveToStorage();
+                renderMemos();
+                showToast(memos[index].archived ? 'アーカイブしました' : 'トップに戻しました');
+            }
+        }
+
+        function toggleComplete(id) {
+            const index = memos.findIndex(m => m.id === id);
+            if (index !== -1) {
+                memos[index].completed = !memos[index].completed;
+                saveToStorage();
+                renderMemos();
+                if (memos[index].completed) {
+                    showToast('完了にしました（履歴へ移動しました）');
+                } else {
+                    showToast('未完了に戻しました（トップへ戻しました）');
+                }
+            }
+        }
+
+        function deleteMemo(id) {
+            memos = memos.filter(m => m.id !== id);
+            saveToStorage();
+            renderMemos();
+            showToast('削除しました');
+        }
+
+        function shareMemo(text) {
+            if (navigator.share) {
+                navigator.share({
+                    text: text,
+                }).catch((error) => console.log('Error sharing', error));
+            } else {
+                showToast('お使いのブラウザは共有未対応です');
+            }
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('quick_memos', JSON.stringify(memos));
+        }
+
+        function renderMemos() {
+            const filteredMemos = memos.filter(m => {
+                if (currentView === 'active') {
+                    return !m.archived && !m.completed;
+                } else {
+                    return m.archived || m.completed;
+                }
+            });
+
+            if (filteredMemos.length === 0) {
+                memoList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                clearArchivedBtn.classList.add('opacity-50', 'pointer-events-none');
+                return;
+            }
+            clearArchivedBtn.classList.remove('opacity-50', 'pointer-events-none');
+            emptyState.classList.add('hidden');
+
+            const now = new Date();
+            const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+            memoList.innerHTML = filteredMemos.map(memo => {
+                const memoDate = new Date(memo.timestamp.raw);
+                const isOld = (now - memoDate) > ONE_WEEK;
+                
+                return `
+                <div class="memo-card bg-white p-5 rounded-2xl border border-blue-100 shadow-sm transition-all hover:shadow-md group ${memo.completed ? 'memo-done' : ''}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-blue-400 bg-blue-50 px-2 py-1 rounded">
+                                ${memo.timestamp.date} ${memo.timestamp.time}
+                            </span>
+                            ${isOld && !memo.completed ? '<span class="text-[10px] font-bold text-white bg-blue-600 px-2 py-0.5 rounded-full animate-pulse">1週間経過</span>' : ''}
+                            ${memo.completed ? '<span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">完了済み</span>' : ''}
+                        </div>
+                        <div class="action-btns flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="shareMemo(\`${memo.text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" class="p-1 text-blue-300 hover:text-blue-600 transition-colors" title="共有">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
+                            </button>
+                            <button onclick="toggleComplete('${memo.id}')" class="p-1 transition-colors ${memo.completed ? 'text-blue-600' : 'text-blue-300 hover:text-blue-600'}" title="${memo.completed ? '未完了に戻す' : '完了にする'}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            </button>
+                            <button onclick="toggleArchive('${memo.id}')" class="text-blue-300 hover:text-blue-600 transition-colors p-1" title="${memo.archived ? 'トップに戻す' : 'アーカイブ'}">
+                                ${memo.archived || memo.completed 
+                                    ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg>'
+                                    : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>'}
+                            </button>
+                            <button onclick="deleteMemo('${memo.id}')" class="text-blue-300 hover:text-red-500 transition-colors p-1" title="削除">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-slate-700 whitespace-pre-wrap leading-relaxed ${memo.completed ? 'line-through opacity-50' : ''}">${escapeHtml(memo.text)}</p>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function showToast(msg) {
+            if (msg === 'メモを保存しました') msg = '「あとで」に保存しました ✍️';
+            toast.textContent = msg;
+            toast.classList.replace('opacity-0', 'opacity-100');
+            setTimeout(() => toast.classList.replace('opacity-100', 'opacity-0'), 2000);
+        }
+
+        // 音声認識
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            let isRecording = false;
+            voiceBtn.addEventListener('click', () => isRecording ? recognition.stop() : recognition.start());
+            recognition.onstart = () => {
+                isRecording = true;
+                voiceBtn.classList.add('recording-pulse', 'text-blue-500', 'bg-blue-50');
+                voiceStatus.classList.remove('hidden');
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                voiceBtn.classList.remove('recording-pulse', 'text-blue-500', 'bg-blue-50');
+                voiceStatus.classList.add('hidden');
+            };
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                memoInput.value += (memoInput.value ? '\n' : '') + transcript;
+                memoInput.focus();
+            };
+        } else {
+            voiceBtn.style.display = 'none';
+        }
+
+        addBtn.addEventListener('click', saveMemo);
+        memoInput.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') saveMemo();
+        });
+        window.onload = () => memoInput.focus();
+    </script>
+</body>
+</html>
